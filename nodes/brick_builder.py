@@ -53,6 +53,7 @@ import moveit_msgs.msg
 import geometry_msgs.msg
 from tf.transformations import quaternion_from_euler
 from std_srvs.srv import Empty,EmptyResponse
+import random
 
 try:
     from math import pi, tau, dist, fabs, cos, sin
@@ -170,7 +171,7 @@ class MoveGroupPythonInterfaceTutorial(object):
         # create services 
         rospy.Service('show_build' , Empty, self.add_all_bricks)
         rospy.Service('reset_scene', Empty, self.remove_all_bricks)
-        rospy.Service('handle_service', Empty, handle_service)
+        rospy.Service('add_brick'  , Empty, self.srv_add_random_brick)
 
 
         # fetch a group of brick data parameters from rosparam server
@@ -190,6 +191,7 @@ class MoveGroupPythonInterfaceTutorial(object):
         self.planning_frame = planning_frame
         self.eef_link = eef_link
         self.group_names = group_names
+        self.brick_id = 0
 
     def go_to_joint_state(self):
         # Copy class variables to local variables to make the web tutorials more clear.
@@ -426,6 +428,30 @@ class MoveGroupPythonInterfaceTutorial(object):
 
         return self.wait_for_state_update(box_is_known=True, timeout=timeout)
 
+
+    def srv_add_random_brick(self,req):
+        self.add_random_brick()
+        return EmptyResponse()
+
+    # add a brick in a random position, but in the dedicated pick up place
+    def add_random_brick(self):
+        angle_rad = random.random()*2*pi
+        q = quaternion_from_euler(0, 0, angle_rad)
+        box_pose = geometry_msgs.msg.PoseStamped()
+        box_pose.header.frame_id = "world"
+        box_pose.pose.orientation.x = q[0]
+        box_pose.pose.orientation.y = q[1]
+        box_pose.pose.orientation.z = q[2]
+        box_pose.pose.orientation.w = q[3]
+        box_pose.pose.position.x = self.yaml_data['pick_place']['position']['x'] + (random.random()-0.5)*self.yaml_data['pick_place']['size']
+        box_pose.pose.position.y = self.yaml_data['pick_place']['position']['y'] + (random.random()-0.5)*self.yaml_data['pick_place']['size']
+        box_pose.pose.position.z = self.yaml_data['pick_place']['position']['z'] + (random.random())* 0.2
+        self.brick_id = self.brick_id + 1
+        box_name = "brick_0" + str(self.brick_id)
+        self.scene.add_box(box_name, box_pose, size=self.brick_size)
+
+
+
     # convert degrees to radian and return the angle 
     def to_rad(self,angle_degrees):
         return angle_degrees*pi/180.0
@@ -452,7 +478,6 @@ class MoveGroupPythonInterfaceTutorial(object):
 
     # add all boxes to see the final build product
     def add_all_bricks(self, req):
-        timeout=4
         thikness = self.yaml_data['thikness']
         step = int(self.angle_range/thikness)
         scene = self.scene
@@ -540,7 +565,7 @@ class MoveGroupPythonInterfaceTutorial(object):
             box_is_attached=False, box_is_known=False, timeout=timeout
         )
 
-
+    
 def main():
     try:
         print("")
