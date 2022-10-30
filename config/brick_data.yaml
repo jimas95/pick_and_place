@@ -1,24 +1,25 @@
 # YAML FILE 
+brick_data:
+  brick_size:
+    width: 0.1
+    height: 0.08
+    length: 0.2
 
-brick_size:
-  width: 0.2
-  height: 0.08
-  length: 0.1
+  # define how many layers of brick shall we do
+  layers: 3
 
-# define how many layers of brick shall we do
-layers: 3
-
-# define how many bricks each layer will contain
-thikness: 4
-angle: 180  # degrees
+  # define how many bricks each layer will contain
+  thikness: 8
+  angle: 180  # degrees
+  radious: 0.5
 
 
-# define dedicated pick place
-pick_place:
-  size: 0.5
-  position:
-    x: 1
-    y: 1
-    z: 1
+  # define dedicated pick place
+  pick_place:
+    size: 0.5
+    position:
+      x: 1
+      y: 1
+      z: 1
 
 

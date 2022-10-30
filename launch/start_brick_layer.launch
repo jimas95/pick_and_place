@@ -4,7 +4,8 @@
 
 <arg name="use_rviz" default="true" doc="Launch Rviz with default config"/>
 
-    <!-- yaml parameters  -->
+    
+
 
 
     <!-- builder  -->
@@ -21,5 +22,9 @@
         <arg name="rviz_config"   value="$(find pick_and_place)/config/configRVIZ.rviz"/>
         <arg name="debug" value="false"/>
     </include>
+
+
+    <!-- yaml parameters  -->
+    <rosparam command="load" file="$(find pick_and_place)/config/brick_data.yaml" />
 
 </launch>

@@ -51,11 +51,13 @@ import rospy
 import moveit_commander
 import moveit_msgs.msg
 import geometry_msgs.msg
+from tf.transformations import quaternion_from_euler
+from std_srvs.srv import Empty,EmptyResponse
 
 try:
-    from math import pi, tau, dist, fabs, cos
+    from math import pi, tau, dist, fabs, cos, sin
 except:  # For Python 2 compatibility
-    from math import pi, fabs, cos, sqrt
+    from math import pi, fabs, cos, sin, sqrt
 
     tau = 2.0 * pi
 
@@ -98,6 +100,9 @@ def all_close(goal, actual, tolerance):
 
     return True
 
+def handle_service(req):
+    rospy.loginfo('called!')
+    return EmptyResponse()
 
 class MoveGroupPythonInterfaceTutorial(object):
     """MoveGroupPythonInterfaceTutorial"""
@@ -161,6 +166,20 @@ class MoveGroupPythonInterfaceTutorial(object):
         print(robot.get_current_state())
         print("")
         ## END_SUB_TUTORIAL
+
+        # create services 
+        rospy.Service('show_build' , Empty, self.add_all_bricks)
+        rospy.Service('reset_scene', Empty, self.remove_all_bricks)
+        rospy.Service('handle_service', Empty, handle_service)
+
+
+        # fetch a group of brick data parameters from rosparam server
+        self.yaml_data = rospy.get_param('brick_data')
+        print(self.yaml_data)
+        self.angle_range = self.yaml_data['angle']
+        self.radious = self.yaml_data['radious']
+        self.brick_size = (self.yaml_data['brick_size']['width'],self.yaml_data['brick_size']['length'],self.yaml_data['brick_size']['height'])
+        
 
         # Misc variables
         self.box_name = ""
@@ -376,6 +395,10 @@ class MoveGroupPythonInterfaceTutorial(object):
         return False
         ## END_SUB_TUTORIAL
 
+
+
+
+
     def add_box(self, timeout=4):
         # Copy class variables to local variables to make the web tutorials more clear.
         # In practice, you should use the class variables directly unless you have a good
@@ -399,7 +422,63 @@ class MoveGroupPythonInterfaceTutorial(object):
         # Copy local variables back to class variables. In practice, you should use the class
         # variables directly unless you have a good reason not to.
         self.box_name = box_name
+
+
         return self.wait_for_state_update(box_is_known=True, timeout=timeout)
+
+    # convert degrees to radian and return the angle 
+    def to_rad(self,angle_degrees):
+        return angle_degrees*pi/180.0
+
+
+    # convert from polar coordinate system(r meters, angle degrees) to x,y,rad
+    def polar_coords(self,angle_degrees):
+        angle_rad = self.to_rad(angle_degrees)
+        x = self.radious*cos(angle_rad)
+        y = self.radious*sin(angle_rad)
+        return [x,y,angle_rad]
+
+
+    # removes all bricks from the scene
+    def remove_all_bricks(self,req):
+        items = self.scene.get_known_object_names()
+        for item in items:
+            # if item contains brick in its name remove it 
+            if("brick_" in item):
+                self.box_name = item
+                self.remove_box()
+        return EmptyResponse()
+
+
+    # add all boxes to see the final build product
+    def add_all_bricks(self, req):
+        timeout=4
+        thikness = self.yaml_data['thikness']
+        step = int(self.angle_range/thikness)
+        scene = self.scene
+
+        for theta in range(0,self.angle_range,step):
+
+            x,y,angle_rad = self.polar_coords(theta)
+            q = quaternion_from_euler(0, 0, angle_rad)
+
+            box_pose = geometry_msgs.msg.PoseStamped()
+            box_pose.header.frame_id = "world"
+            box_pose.pose.orientation.x = q[0]
+            box_pose.pose.orientation.y = q[1]
+            box_pose.pose.orientation.z = q[2]
+            box_pose.pose.orientation.w = q[3]
+
+            
+            box_pose.pose.position.x = x
+            box_pose.pose.position.y = y
+            box_pose.pose.position.z = 0.1
+            
+            box_name = "brick_0" + str(theta)
+            scene.add_box(box_name, box_pose, size=self.brick_size)
+
+        return EmptyResponse()
+
 
     def attach_box(self, timeout=4):
         # Copy class variables to local variables to make the web tutorials more clear.
@@ -453,22 +532,9 @@ class MoveGroupPythonInterfaceTutorial(object):
         )
 
     def remove_box(self, timeout=4):
-        # Copy class variables to local variables to make the web tutorials more clear.
-        # In practice, you should use the class variables directly unless you have a good
-        # reason not to.
         box_name = self.box_name
-        scene = self.scene
-
-        ## BEGIN_SUB_TUTORIAL remove_object
-        ##
-        ## Removing Objects from the Planning Scene
-        ## ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-        ## We can remove the box from the world.
-        scene.remove_world_object(box_name)
-
-        ## **Note:** The object must be detached before we can remove it from the world
-        ## END_SUB_TUTORIAL
-
+        self.scene.remove_world_object(box_name)
+        print("removing --> " + box_name)
         # We wait for the planning scene to update.
         return self.wait_for_state_update(
             box_is_attached=False, box_is_known=False, timeout=timeout
@@ -483,15 +549,14 @@ def main():
         print("----------------------------------------------------------")
         print("Press Ctrl-D to exit at any time")
         print("")
-        input(
-            "============ Press `Enter` to begin the tutorial by setting up the moveit_commander ..."
-        )
+    
         tutorial = MoveGroupPythonInterfaceTutorial()
 
-        input(
-            "============ Press `Enter` to execute a movement using a joint state goal ..."
-        )
-        tutorial.go_to_joint_state()
+
+        # input("============ Press `Enter` to see final build ...")
+        # tutorial.add_all_bricks()
+        # input("============ Press `Enter` to see final build ...")
+        # tutorial.remove_all_bricks()
 
         input("============ Press `Enter` to execute a movement using a pose goal ...")
         tutorial.go_to_pose_goal()
