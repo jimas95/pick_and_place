@@ -1,0 +1,25 @@
+
+<launch>
+
+
+<arg name="use_rviz" default="true" doc="Launch Rviz with default config"/>
+
+    <!-- yaml parameters  -->
+
+
+    <!-- builder  -->
+    <!-- <node pkg="pick_and_place" type="brick_builder.py" name="brick_builder" /> -->
+
+    <!-- launch panda robot -->
+    <include file="$(find panda_moveit_config)/launch/demo.launch">
+        <arg name="use_rviz" value="false"/>
+    </include>
+
+    <!-- Run Rviz and load the default config to see the state of the move_group node -->
+    <include file="$(find panda_moveit_config)/launch/moveit_rviz.launch" if="$(arg use_rviz)">
+        <arg name="rviz_tutorial" value="false"/>
+        <arg name="rviz_config"   value="$(find pick_and_place)/config/configRVIZ.rviz"/>
+        <arg name="debug" value="false"/>
+    </include>
+
+</launch>
