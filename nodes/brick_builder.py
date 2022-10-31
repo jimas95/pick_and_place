@@ -53,6 +53,8 @@ import moveit_msgs.msg
 import geometry_msgs.msg
 from tf.transformations import quaternion_from_euler
 from std_srvs.srv import Empty,EmptyResponse
+from pick_and_place.srv import go_to,go_toResponse
+
 import random
 
 try:
@@ -170,8 +172,9 @@ class MoveGroupPythonInterfaceTutorial(object):
 
         # create services 
         rospy.Service('show_build' , Empty, self.add_all_bricks)
-        rospy.Service('reset_scene', Empty, self.remove_all_bricks)
+        rospy.Service('reset_scene', Empty, self.srv_remove_all_bricks)
         rospy.Service('add_brick'  , Empty, self.srv_add_random_brick)
+        rospy.Service('go_to'      , go_to, self.srv_go_to)
 
 
         # fetch a group of brick data parameters from rosparam server
@@ -183,7 +186,7 @@ class MoveGroupPythonInterfaceTutorial(object):
         
 
         # Misc variables
-        self.box_name = ""
+        self.box_name = "brick_01"
         self.robot = robot
         self.scene = scene
         self.move_group = move_group
@@ -192,6 +195,11 @@ class MoveGroupPythonInterfaceTutorial(object):
         self.eef_link = eef_link
         self.group_names = group_names
         self.brick_id = 0
+        self.brick_pose= geometry_msgs.msg.PoseStamped()
+
+        # reset scene
+        self.detach_box()
+        self.remove_all_bricks()
 
     def go_to_joint_state(self):
         # Copy class variables to local variables to make the web tutorials more clear.
@@ -228,6 +236,125 @@ class MoveGroupPythonInterfaceTutorial(object):
         # For testing:
         current_joints = move_group.get_current_joint_values()
         return all_close(joint_goal, current_joints, 0.01)
+
+    def srv_go_to(self,req):
+        q = quaternion_from_euler(req.roll, req.pitch, req.yaw)
+        pose_goal = geometry_msgs.msg.Pose()
+        pose_goal.orientation.x = q[0]
+        pose_goal.orientation.y = q[1]
+        pose_goal.orientation.z = q[2]
+        pose_goal.orientation.w = q[3]
+        pose_goal.position.x = req.x
+        pose_goal.position.y = req.y
+        pose_goal.position.z = req.z
+        result = self.go_to(pose_goal)
+        return go_toResponse(result)
+
+    def go_home(self):
+        q = quaternion_from_euler(pi, 0, -pi/4)
+        pose_goal = geometry_msgs.msg.Pose()
+        pose_goal.orientation.x = q[0]
+        pose_goal.orientation.y = q[1]
+        pose_goal.orientation.z = q[2]
+        pose_goal.orientation.w = q[3]
+        pose_goal.position.x = -0.5
+        pose_goal.position.y =  0.0
+        pose_goal.position.z =  0.5
+        self.go_to(pose_goal)
+
+    def go_to(self,pose_goal):
+        self.move_group.set_pose_target(pose_goal)
+        success = self.move_group.go(wait=True)
+        if(success):
+            rospy.loginfo("success of go to")
+        else:
+            rospy.logerr("go to failed to reach target")
+        self.move_group.stop()
+        self.move_group.clear_pose_targets()
+        current_pose = self.move_group.get_current_pose().pose
+        return all_close(pose_goal, current_pose, 0.01)
+
+
+
+    def grab_brick(self):
+
+
+        # create grabing pose 
+        pose_goal = geometry_msgs.msg.Pose()
+        pose_goal.orientation.x = self.brick_pose.pose.orientation.x
+        pose_goal.orientation.y = self.brick_pose.pose.orientation.y
+        pose_goal.orientation.z = self.brick_pose.pose.orientation.z
+        pose_goal.orientation.w = self.brick_pose.pose.orientation.w
+        pose_goal.position.x    = self.brick_pose.pose.position.x
+        pose_goal.position.y    = self.brick_pose.pose.position.y
+        pose_goal.position.z    = self.brick_pose.pose.position.z
+
+        print("go_home")
+        self.go_home()
+
+        # aling with cube
+        print("pree_grab")
+        pose_goal.position.z = pose_goal.position.z + 0.2 + self.yaml_data['brick_size']['height']/2
+        self.go_to(pose_goal)
+
+        # go to cube
+        print("pose_grab")
+        pose_goal.position.z = pose_goal.position.z - 0.2 + self.yaml_data['brick_size']['height']
+        self.go_to(pose_goal)
+
+        # attach 
+        print("attach_box")
+        self.box_name = "brick_0" + str(self.brick_id)
+        self.attach_box()
+
+        print("go_home")
+        self.go_home()
+
+    
+    def place_brick(self,pose):
+
+        print("go_home")
+        self.go_home()
+
+        # aling with cube
+        print("pree_place")
+        pose.position.z = pose.position.z + 0.2 
+        self.go_to(pose)
+
+        # go to cube
+        print("pose_place")
+        pose.position.z = pose.position.z - 0.15
+        self.go_to(pose)
+
+        # attach 
+        print("detach_box")
+        self.detach_box()
+
+        print("go_home")
+        self.go_home()
+
+
+    def simple_pick_and_place(self):
+        
+        # pick
+        self.add_random_brick()
+        self.grab_brick()
+
+        # place 
+        self.add_random_brick()
+
+
+        # create place pose 
+        pose_goal = geometry_msgs.msg.Pose()
+        pose_goal.orientation.x = self.brick_pose.pose.orientation.x
+        pose_goal.orientation.y = self.brick_pose.pose.orientation.y
+        pose_goal.orientation.z = self.brick_pose.pose.orientation.z
+        pose_goal.orientation.w = self.brick_pose.pose.orientation.w
+        pose_goal.position.x    = self.brick_pose.pose.position.x
+        pose_goal.position.y    = self.brick_pose.pose.position.y
+        pose_goal.position.z    = self.brick_pose.pose.position.z + self.yaml_data['brick_size']['height']*2
+
+        self.place_brick(pose_goal)
 
     def go_to_pose_goal(self):
         # Copy class variables to local variables to make the web tutorials more clear.
@@ -423,7 +550,7 @@ class MoveGroupPythonInterfaceTutorial(object):
         ## END_SUB_TUTORIAL
         # Copy local variables back to class variables. In practice, you should use the class
         # variables directly unless you have a good reason not to.
-        self.box_name = box_name
+        # self.box_name = box_name
 
 
         return self.wait_for_state_update(box_is_known=True, timeout=timeout)
@@ -436,7 +563,7 @@ class MoveGroupPythonInterfaceTutorial(object):
     # add a brick in a random position, but in the dedicated pick up place
     def add_random_brick(self):
         angle_rad = random.random()*2*pi
-        q = quaternion_from_euler(0, 0, angle_rad)
+        q = quaternion_from_euler(pi, 0, angle_rad)
         box_pose = geometry_msgs.msg.PoseStamped()
         box_pose.header.frame_id = "world"
         box_pose.pose.orientation.x = q[0]
@@ -449,6 +576,14 @@ class MoveGroupPythonInterfaceTutorial(object):
         self.brick_id = self.brick_id + 1
         box_name = "brick_0" + str(self.brick_id)
         self.scene.add_box(box_name, box_pose, size=self.brick_size)
+        
+        # this is a bug, we add pi/4 to fix orientation of end effector 
+        q = quaternion_from_euler(pi, 0, angle_rad+pi/4)
+        box_pose.pose.orientation.x = q[0]
+        box_pose.pose.orientation.y = q[1]
+        box_pose.pose.orientation.z = q[2]
+        box_pose.pose.orientation.w = q[3]
+        self.brick_pose = box_pose
 
 
 
@@ -464,16 +599,18 @@ class MoveGroupPythonInterfaceTutorial(object):
         y = self.radious*sin(angle_rad)
         return [x,y,angle_rad]
 
+    def srv_remove_all_bricks(self,req):
+        self.remove_all_bricks()
+        return EmptyResponse()
 
     # removes all bricks from the scene
-    def remove_all_bricks(self,req):
+    def remove_all_bricks(self):
         items = self.scene.get_known_object_names()
         for item in items:
             # if item contains brick in its name remove it 
             if("brick_" in item):
                 self.box_name = item
                 self.remove_box()
-        return EmptyResponse()
 
 
     # add all boxes to see the final build product
@@ -582,6 +719,11 @@ def main():
         # tutorial.add_all_bricks()
         # input("============ Press `Enter` to see final build ...")
         # tutorial.remove_all_bricks()
+        input("---")
+        tutorial.go_home()
+        # tutorial.add_random_brick()
+        # tutorial.grab_brick()
+        tutorial.simple_pick_and_place()
 
         input("============ Press `Enter` to execute a movement using a pose goal ...")
         tutorial.go_to_pose_goal()
