@@ -1,0 +1,16 @@
+# List of repositories to use within your workspace
+# See https://github.com/dirk-thomas/vcstool
+############ 
+# Example:
+############
+repositories:
+  franka_ros:
+    type: git
+    url: https://github.com/frankaemika/franka_ros.git
+    version: noetic-devel
+    
+  pick_and_place:
+    type: git
+    url: https://github.com/jimas95/pick_and_place.git
+    version: main
+
