@@ -8,10 +8,10 @@ project(pick_and_place)
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
+    actionlib_msgs
+    message_generation
     rospy
     std_msgs
-    message_generation
-    actionlib_msgs
 )
 
 ## System dependencies are found with CMake's conventions
@@ -63,14 +63,14 @@ add_service_files(
 ## Generate actions in the 'action' folder
 add_action_files(
   FILES
-  pick_and_place.action
+  pickAndPlace.action
 )
 
 ## Generate added messages and services with any dependencies listed here
 generate_messages(
   DEPENDENCIES
-  std_msgs  # Or other packages containing msgs
   actionlib_msgs
+  std_msgs 
 )
 
 ################################################
@@ -105,7 +105,7 @@ generate_messages(
 catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES pick_and_place
- CATKIN_DEPENDS message_runtime
+ CATKIN_DEPENDS actionlib_msgs message_runtime std_msgs 
 #  DEPENDS system_lib
 )
 
