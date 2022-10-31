@@ -107,80 +107,37 @@ def handle_service(req):
     rospy.loginfo('called!')
     return EmptyResponse()
 
-class MoveGroupPythonInterfaceTutorial(object):
-    """MoveGroupPythonInterfaceTutorial"""
+class PICK_AND_PLACE_BRICKS(object):
+    """PICK_AND_PLACE_BRICKS"""
 
     def __init__(self):
-        super(MoveGroupPythonInterfaceTutorial, self).__init__()
+        super(PICK_AND_PLACE_BRICKS, self).__init__()
 
-        ## BEGIN_SUB_TUTORIAL setup
-        ##
         ## First initialize `moveit_commander`_ and a `rospy`_ node:
         moveit_commander.roscpp_initialize(sys.argv)
-        rospy.init_node("move_group_python_interface_tutorial", anonymous=True)
+        rospy.init_node("pick_and_place_node", anonymous=False, log_level=rospy.INFO)
 
-        ## Instantiate a `RobotCommander`_ object. Provides information such as the robot's
-        ## kinematic model and the robot's current joint states
+        ## Instantiate a `RobotCommander`_ object.
         robot = moveit_commander.RobotCommander()
 
-        ## Instantiate a `PlanningSceneInterface`_ object.  This provides a remote interface
-        ## for getting, setting, and updating the robot's internal understanding of the
-        ## surrounding world:
+        ## for getting, setting, and updating the robot's internal understanding of the world
         scene = moveit_commander.PlanningSceneInterface()
 
-        ## Instantiate a `MoveGroupCommander`_ object.  This object is an interface
-        ## to a planning group (group of joints).  In this tutorial the group is the primary
-        ## arm joints in the Panda robot, so we set the group's name to "panda_arm".
-        ## If you are using a different robot, change this value to the name of your robot
         ## arm planning group.
-        ## This interface can be used to plan and execute motions:
         group_name = "panda_arm"
         move_group = moveit_commander.MoveGroupCommander(group_name)
-
-        ## Create a `DisplayTrajectory`_ ROS publisher which is used to display
-        ## trajectories in Rviz:
-        display_trajectory_publisher = rospy.Publisher(
-            "/move_group/display_planned_path",
-            moveit_msgs.msg.DisplayTrajectory,
-            queue_size=20,
-        )
-
-        ## END_SUB_TUTORIAL
-
-        ## BEGIN_SUB_TUTORIAL basic_info
-        ##
-        ## Getting Basic Information
-        ## ^^^^^^^^^^^^^^^^^^^^^^^^^
-        # We can get the name of the reference frame for this robot:
-        planning_frame = move_group.get_planning_frame()
-        print("============ Planning frame: %s" % planning_frame)
-
-        # We can also print the name of the end-effector link for this group:
-        eef_link = move_group.get_end_effector_link()
-        print("============ End effector link: %s" % eef_link)
-
-        # We can get a list of all the groups in the robot:
-        group_names = robot.get_group_names()
-        print("============ Available Planning Groups:", robot.get_group_names())
-
-        # Sometimes for debugging it is useful to print the entire state of the
-        # robot:
-        # print("============ Printing robot state")
-        # print(robot.get_current_state())
-        # print("")
-        ## END_SUB_TUTORIAL
 
         # create services 
         rospy.Service('show_build' , Empty, self.add_all_bricks)
         rospy.Service('reset_scene', Empty, self.srv_remove_all_bricks)
         rospy.Service('add_brick'  , Empty, self.srv_add_random_brick)
-        rospy.Service('add_brick'  , Empty, self.srv_simple_pick_and_place)
+        rospy.Service('pickPlace'  , Empty, self.srv_simple_pick_and_place)
         rospy.Service('go_to'      , go_to, self.srv_go_to)
 
 
         # fetch a group of brick data parameters from rosparam server
         self.yaml_data = rospy.get_param('brick_data')
-        print(self.yaml_data)
+        # print(self.yaml_data)
         self.angle_range = self.yaml_data['angle']
         self.radious = self.yaml_data['radious']
         self.brick_size = (self.yaml_data['brick_size']['width'],self.yaml_data['brick_size']['length'],self.yaml_data['brick_size']['height'])
@@ -191,10 +148,7 @@ class MoveGroupPythonInterfaceTutorial(object):
         self.robot = robot
         self.scene = scene
         self.move_group = move_group
-        self.display_trajectory_publisher = display_trajectory_publisher
-        self.planning_frame = planning_frame
-        self.eef_link = eef_link
-        self.group_names = group_names
+        self.eef_link = move_group.get_end_effector_link()
         self.brick_id = 0
         self.brick_pose= geometry_msgs.msg.PoseStamped()
 
@@ -416,25 +370,30 @@ class MoveGroupPythonInterfaceTutorial(object):
         step = int(self.angle_range/thikness)
         scene = self.scene
 
-        for theta in range(0,self.angle_range,step):
+        for floor in range(self.yaml_data['layers']):
+            odd_or_even = floor % 2
+            start = 0 
+            if(odd_or_even):
+                start = int(step/2.0)
+            for theta in range(start,self.angle_range,step):
 
-            x,y,angle_rad = self.polar_coords(theta)
-            q = quaternion_from_euler(0, 0, angle_rad)
+                x,y,angle_rad = self.polar_coords(theta)
+                q = quaternion_from_euler(0, 0, angle_rad)
 
-            box_pose = geometry_msgs.msg.PoseStamped()
-            box_pose.header.frame_id = "world"
-            box_pose.pose.orientation.x = q[0]
-            box_pose.pose.orientation.y = q[1]
-            box_pose.pose.orientation.z = q[2]
-            box_pose.pose.orientation.w = q[3]
+                box_pose = geometry_msgs.msg.PoseStamped()
+                box_pose.header.frame_id = "world"
+                box_pose.pose.orientation.x = q[0]
+                box_pose.pose.orientation.y = q[1]
+                box_pose.pose.orientation.z = q[2]
+                box_pose.pose.orientation.w = q[3]
 
-            
-            box_pose.pose.position.x = x
-            box_pose.pose.position.y = y
-            box_pose.pose.position.z = 0.1
-            
-            box_name = "brick_0" + str(theta)
-            scene.add_box(box_name, box_pose, size=self.brick_size)
+                
+                box_pose.pose.position.x = x
+                box_pose.pose.position.y = y
+                box_pose.pose.position.z = 0.1 + floor*self.yaml_data['brick_size']['height']
+                self.brick_id = self.brick_id + 1
+                box_name = "brick_0" + str(self.brick_id)
+                scene.add_box(box_name, box_pose, size=self.brick_size)
 
         return EmptyResponse()
 
@@ -475,14 +434,8 @@ def main():
         print("Press Ctrl-D to exit at any time")
         print("")
     
-        tutorial = MoveGroupPythonInterfaceTutorial()
-
-
-        input("---")
-        tutorial.go_home()
-        # tutorial.add_random_brick()
-        # tutorial.grab_brick()
-        tutorial.simple_pick_and_place()
+        tutorial = PICK_AND_PLACE_BRICKS()
+        rospy.spin()
 
     except rospy.ROSInterruptException:
         return
