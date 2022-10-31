@@ -1,45 +1,5 @@
 #!/usr/bin/env python
 
-# Software License Agreement (BSD License)
-#
-# Copyright (c) 2013, SRI International
-# All rights reserved.
-#
-# Redistribution and use in source and binary forms, with or without
-# modification, are permitted provided that the following conditions
-# are met:
-#
-#  * Redistributions of source code must retain the above copyright
-#    notice, this list of conditions and the following disclaimer.
-#  * Redistributions in binary form must reproduce the above
-#    copyright notice, this list of conditions and the following
-#    disclaimer in the documentation and/or other materials provided
-#    with the distribution.
-#  * Neither the name of SRI International nor the names of its
-#    contributors may be used to endorse or promote products derived
-#    from this software without specific prior written permission.
-#
-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-# "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-# LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-# FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-# COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-# INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-# BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-# LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
-# LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
-# ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-# POSSIBILITY OF SUCH DAMAGE.
-#
-# Author: Acorn Pooley, Mike Lautman
-
-## BEGIN_SUB_TUTORIAL imports
-##
-## To use the Python MoveIt interfaces, we will import the `moveit_commander`_ namespace.
-## This namespace provides us with a `MoveGroupCommander`_ class, a `PlanningSceneInterface`_ class,
-## and a `RobotCommander`_ class. More on these below. We also import `rospy`_ and some messages that we will use:
-##
 
 # Python 2/3 compatibility imports
 from __future__ import print_function
@@ -55,6 +15,8 @@ from tf.transformations import quaternion_from_euler
 from std_srvs.srv import Empty,EmptyResponse
 from pick_and_place.srv import go_to,go_toResponse
 
+import actionlib
+import pick_and_place.msg
 import random
 
 try:
@@ -103,9 +65,6 @@ def all_close(goal, actual, tolerance):
 
     return True
 
-def handle_service(req):
-    rospy.loginfo('called!')
-    return EmptyResponse()
 
 class PICK_AND_PLACE_BRICKS(object):
     """PICK_AND_PLACE_BRICKS"""
@@ -137,11 +96,22 @@ class PICK_AND_PLACE_BRICKS(object):
 
         # fetch a group of brick data parameters from rosparam server
         self.yaml_data = rospy.get_param('brick_data')
-        # print(self.yaml_data)
         self.angle_range = self.yaml_data['angle']
         self.radious = self.yaml_data['radious']
         self.brick_size = (self.yaml_data['brick_size']['width'],self.yaml_data['brick_size']['length'],self.yaml_data['brick_size']['height'])
         
+
+        # set up actions 
+        name = "simple_pick_and_place"
+        self.simple_action = actionlib.SimpleActionServer(name, pick_and_place.msg.pick_and_placeAction, execute_cb=self.simple_pick_and_place_action_imp, auto_start = False)
+        self.simple_action.start()
+
+        name = "build_wall"
+        self.build_action = actionlib.SimpleActionServer(name, pick_and_place.msg.pick_and_placeAction, execute_cb=self.build_action_imp, auto_start = False)
+        self.build_action.start()
+
+        self.simple_feedback = pick_and_place.msg.pick_and_placeFeedback()
+        self.simple_result = pick_and_place.msg.pick_and_placeResult()  
 
         # Misc variables
         self.box_name = "brick_01"
@@ -155,6 +125,114 @@ class PICK_AND_PLACE_BRICKS(object):
         # reset scene
         self.detach_box()
         self.remove_all_bricks()
+
+
+
+    def simple_pick_and_place_action_imp(self,goal):
+        success = True
+        pose_goal = geometry_msgs.msg.Pose()
+        
+        # publish info to the console for the user
+        rospy.loginfo("START SIMPLE PICK AND PLACE ACTION")
+        
+
+        # pick
+        rospy.loginfo("add_random_brick 1")
+        self.add_random_brick()
+        rospy.loginfo("attemting to grab brick 1")
+        self.simple_feedback.x = self.brick_pose.pose.position.x
+        self.simple_feedback.y = self.brick_pose.pose.position.y
+        self.simple_feedback.z = self.brick_pose.pose.position.z
+        self.simple_feedback.brick_id = self.brick_id
+        self.grab_brick()
+
+        # place 
+        rospy.loginfo("add_random_brick 2")
+        self.add_random_brick()
+
+        # create place pose 
+        pose_goal.orientation.x = self.brick_pose.pose.orientation.x
+        pose_goal.orientation.y = self.brick_pose.pose.orientation.y
+        pose_goal.orientation.z = self.brick_pose.pose.orientation.z
+        pose_goal.orientation.w = self.brick_pose.pose.orientation.w
+        pose_goal.position.x    = self.brick_pose.pose.position.x
+        pose_goal.position.y    = self.brick_pose.pose.position.y
+        pose_goal.position.z    = self.brick_pose.pose.position.z + self.yaml_data['brick_size']['height']*2
+
+        self.simple_feedback.x = pose_goal.position.x
+        self.simple_feedback.y = pose_goal.position.y
+        self.simple_feedback.z = pose_goal.position.z
+        self.simple_feedback.brick_id = self.brick_id
+
+        rospy.loginfo("attemting to place brick 1 on top of second brick")
+        self.place_brick(pose_goal)
+
+
+
+        self.simple_action.publish_feedback(self.simple_feedback)
+
+        if self.simple_action.is_preempt_requested():
+            self.simple_action.set_preempted()
+            success = False
+
+        if success:
+            self.simple_result.result = True
+            rospy.loginfo('%s: Succeeded' % self._action_name)
+            self.simple_action.set_succeeded(self.simple_result)
+        
+
+
+    def build_action_imp(self,goal):
+        success = True
+        pose_goal = geometry_msgs.msg.Pose()
+        
+        # publish info to the console for the user
+        rospy.loginfo("START SIMPLE PICK AND PLACE ACTION")
+        
+
+        # pick
+        rospy.loginfo("add_random_brick 1")
+        self.add_random_brick()
+        rospy.loginfo("attemting to grab brick 1")
+        self.simple_feedback.x = self.brick_pose.pose.position.x
+        self.simple_feedback.y = self.brick_pose.pose.position.y
+        self.simple_feedback.z = self.brick_pose.pose.position.z
+        self.simple_feedback.brick_id = self.brick_id
+        self.grab_brick()
+
+        # place 
+        rospy.loginfo("add_random_brick 2")
+        self.add_random_brick()
+
+        # create place pose 
+        pose_goal.orientation.x = self.brick_pose.pose.orientation.x
+        pose_goal.orientation.y = self.brick_pose.pose.orientation.y
+        pose_goal.orientation.z = self.brick_pose.pose.orientation.z
+        pose_goal.orientation.w = self.brick_pose.pose.orientation.w
+        pose_goal.position.x    = self.brick_pose.pose.position.x
+        pose_goal.position.y    = self.brick_pose.pose.position.y
+        pose_goal.position.z    = self.brick_pose.pose.position.z + self.yaml_data['brick_size']['height']*2
+
+        self.simple_feedback.x = pose_goal.position.x
+        self.simple_feedback.y = pose_goal.position.y
+        self.simple_feedback.z = pose_goal.position.z
+        self.simple_feedback.brick_id = self.brick_id
+
+        rospy.loginfo("attemting to place brick 1 on top of second brick")
+        self.place_brick(pose_goal)
+
+
+
+        self.simple_action.publish_feedback(self.simple_feedback)
+
+        if self.simple_action.is_preempt_requested():
+            self.simple_action.set_preempted()
+            success = False
+
+        if success:
+            self.simple_result.result = True
+            rospy.loginfo('%s: Succeeded' % self._action_name)
+            self.simple_action.set_succeeded(self.simple_result)
 
     def srv_simple_pick_and_place(self,req):
         self.simple_pick_and_place()
