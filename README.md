@@ -70,10 +70,10 @@ An extra action/functionality has been implemented where the robot will start pi
 mkdir -p ~/ws/src
 cd ~/ws/src
 wstool init .
-wstool merge -t . https://github.com/jimas95/pick_and_place/blob/main/ros.repos
+wstool merge -t . https://raw.githubusercontent.com/jimas95/pick_and_place/main/repos.rosinstall
 wstool update -t .
 rosdep install -y --from-paths . --ignore-src --rosdistro noetic
-./build.sh
+catkin build
 ```
 
 ## How To Launch
