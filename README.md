@@ -24,20 +24,45 @@ Write a service that when called, plans and executes a motion that stacks on box
 
 ### Bonus: Use an action instead of a service
 
-### Acknowledgements
+### Acknowledgments
 
 VSCode devcontainer environment setup inspired Allison Thackston's work found here:
 - https://github.com/athackst/vscode_ros2_workspace
 - https://www.allisonthackston.com/articles/vscode-docker-ros2.html
 
 
-- [x] Milestone #1
-- [x] Milestone #2
-- [x] Milestone #3
-- [x] Milestone Extra
+## Milestone Tasks 
+- [x] Done --> Milestone #1
+- [x] Done --> Milestone #2
+- [x] Done --> Milestone #3
+- [x] Done --> Milestone Extra
 
 
-## Install
+
+## Brick Stacking
+For the (Milestone #2) brick stack, the idea is first we spawn the first brick we pick it up. That ensures there will be no conflict with the second brick. We spawn the second brick and then place the first one on top of it.
+
+## Build Wall
+I took this assignment a step further and added the capability of building walls. This is configured from the yaml file. The idea is since we can now easily pick and place a brick, let's do something with it. So if this mode is activated the robot will start to pick bricks and build a wall around him.
+![wall.png](https://github.com/jimas95/pick_and_place/blob/main/gifs/wall.png)
+
+
+
+## Approach
+The main approach here is that we exploit moveit both for planning and the PlanningSceneInterface in order to avoid obstacles. The whole implementation is based on the tutorial demo 'panda_moveit_config demo.launch'. A main function called go_to is responsible for moving the eef to the desired position and orientation. After this, additional functions for pick and place use the go_to function to perform simple manipulations. 
+
+### Dedicated Pick-Up Space
+The brick_data.yaml file defines a dedicated space (a cube of reconfigurable size(default 0.5)) where the bricks will be spawned. Inside this space, the bricks can be spawned anywhere and with random positions and orientations but always within this imaginary cube. 
+
+### Pick And Place 
+The brick position and size are considered already known. Given those, we set the planer to first align with the orientation of the brick and right above it (on z axis) this is considered the pre-grasping position. After this first move, we move to the grasping position which is the position of the brick. When we reach the desired position we attach the eef to it and go back to pre-grasping position. A similar approach is being implemented for placing the brick in the desired position.
+
+### Build A Wall
+An extra action/functionality has been implemented where the robot will start picking up bricks and start building a circular wall around it. The size,position and layers of the wall are set by the yaml file. 
+![build_wall](https://github.com/jimas95/pick_and_place/blob/main/gifs/build_wall.gif)
+
+
+## How To Install
 ```
 mkdir -p ~/ws/src
 cd ~/ws/src
@@ -45,22 +70,25 @@ wstool init .
 wstool merge -t . https://github.com/jimas95/pick_and_place/blob/main/ros.repos
 wstool update -t .
 rosdep install -y --from-paths . --ignore-src --rosdistro noetic
-./build
+./build.sh
 ```
 
-## HOW TO LAUNCH
+## How To Launch
 It is recommended to launch the panda robot separate from the pick and place node. Hence 
 ```
 cd ws/
 source devel/setup.bash
-roslaunch pick_and_place start_brick_layer.launch
+roslaunch pick_and_place start_brick_layer.launch start_builder:=False start_action:=False
 rosrun pick_and_place brick_builder.py
-rosrun pick_and_place action_client.py
+roslaunch pick_and_place start_action.launch mode:=False
 
-otherwise you can try (but does not connect every time)
-roslaunch pick_and_place start_brick_layer.launch launch_all:=True
+#otherwise you can try to launch all(sometimes does not connect with move it commander)
+roslaunch pick_and_place start_brick_layer.launch
+
+#for Build wall mode run 
+roslaunch pick_and_place start_action.launch mode:=False
 ```
-## SERVICES
+## Services
 Multiple Services do exist 
 ```
 1. rospy.Service('show_build' , Empty, self.add_all_bricks)
@@ -78,37 +106,21 @@ Multiple Services do exist
 
 3. add a brick in the dedicated space but in a random position and orientation
 ![add_brick](https://github.com/jimas95/pick_and_place/blob/main/gifs/add_brick.gif)
+
 4. perform a simple pick and place brick stacking task (Milestone #2)
 ![clear_scene](https://github.com/jimas95/pick_and_place/blob/main/gifs/brick_stack.gif)
+
 5. I used it, mainly as a helper function, it assigns the robots eef to plan and execute a pose goal 
 
-## BRICK STACKING
-For the (Milestone #2) brick stack, the idea is first we spawn the first brick we pick it up. That ensures there will be no conflict with the second brick. We spawn the second brick and then place the first one on top of it.
-
-## BUILD WALL
-I took this assignment a step further and added the capability of building walls. This is configured from the yaml file. The idea is since we can now easily pick and place a brick, let's do something with it. So if this mode is activated the robot will start to pick bricks and build a wall around him.
-![wall.png](https://github.com/jimas95/pick_and_place/blob/main/gifs/wall.png)
 
 
-## ACTIONS
+## Actions
 There are two different actions that have been implemented.
 1. stacks one brick on top of the other 
 2. the robot will start to pick up bricks and build a wall around him 
 
 ```
-rosparam set /action_build_wall False
-rosrun pick_and_place action_client.py 
-rosparam set /action_build_wall True
-rosrun pick_and_place action_client.py
+roslaunch pick_and_place start_action.launch mode:=False
+roslaunch pick_and_place start_action.launch mode:=True
+
 ```
-
-## Approach
-The main approach here is that we exploit moveit both for planning and the PlanningSceneInterface in order to avoid obstacles. The whole implementation is based on the tutorial demo 'panda_moveit_config demo.launch'   
-
-### Dedicated Pick-Up Space
-The brick_data.yaml file defines a dedicated space (a rectangle of reconfigurable size(default 0.5)) where the bricks will be spawned. Inside these spaces, the bricks can be spawned anywhere and with random orientation. 
-
-### Pick And Place 
-The brick position and size are considered already known. Given those, we set the planer to first align with the orientation of the brick and right above it (on z axis) this is considered the pre-grasping position. After the first move, then we move to the grasping position which is the position of the brick and after we reach it we attach the eef to it and go back to pre-grasping position. 
-
-### Pick And Place 
