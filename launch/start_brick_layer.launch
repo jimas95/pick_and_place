@@ -1,7 +1,7 @@
 
 <launch>
 <arg name="use_rviz" default="true" doc="Launch Rviz with default config"/>
-<arg name="mode"     default="true" doc="select mode, True for wall build, false(default) for brick stacking"/>
+<arg name="mode"     default="false" doc="select mode, True for wall build, false(default) for brick stacking"/>
 <arg name="start_action"   default="true" doc="start client node"/>
 <arg name="start_builder"  default="true" doc="start buider node"/>
 
