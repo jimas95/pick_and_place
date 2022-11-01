@@ -9,9 +9,9 @@ brick_data:
   layers: 3
 
   # define how many bricks each layer will contain
-  thikness: 8
-  angle: 180  # degrees
-  radious: 0.5
+  thikness: 4
+  angle: 90  # degrees
+  radious: 0.6
 
 
   # define dedicated pick place
