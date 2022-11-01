@@ -44,7 +44,7 @@ For the (Milestone #2) brick stack, the idea is first we spawn the first brick w
 
 ## Build Wall
 I took this assignment a step further and added the capability of building walls. This is configured from the yaml file. The idea is since we can now easily pick and place a brick, let's do something with it. So if this mode is activated the robot will start to pick bricks and build a wall around him.
-![wall.png](https://github.com/jimas95/pick_and_place/blob/main/gifs/wall.png)
+![build_wall](https://github.com/jimas95/pick_and_place/blob/main/gifs/build_wall.gif)
 
 
 
@@ -56,10 +56,12 @@ The brick_data.yaml file defines a dedicated space (a cube of reconfigurable siz
 
 ### Pick And Place 
 The brick position and size are considered already known. Given those, we set the planer to first align with the orientation of the brick and right above it (on z axis) this is considered the pre-grasping position. After this first move, we move to the grasping position which is the position of the brick. When we reach the desired position we attach the eef to it and go back to pre-grasping position. A similar approach is being implemented for placing the brick in the desired position.
+![brick_stack](https://github.com/jimas95/pick_and_place/blob/main/gifs/brick_stack.gif)
+
 
 ### Build A Wall
 An extra action/functionality has been implemented where the robot will start picking up bricks and start building a circular wall around it. The size,position and layers of the wall are set by the yaml file. 
-![build_wall](https://github.com/jimas95/pick_and_place/blob/main/gifs/build_wall.gif)
+![build_wall_robot](https://github.com/jimas95/pick_and_place/blob/main/gifs/build_wall_robot.gif)
 
 
 ## How To Install
@@ -99,7 +101,7 @@ Multiple Services do exist
 ```
 
 1. It shows the final wall that we will attempt to build 
-![build_wall](https://github.com/jimas95/pick_and_place/blob/main/gifs/build_wall.gif)
+![wall.png](https://github.com/jimas95/pick_and_place/blob/main/gifs/wall.png)
 
 2. will reset the scene in moveit, by removing all the bricks from it
 ![clear_scene](https://github.com/jimas95/pick_and_place/blob/main/gifs/clear_scene.gif)
