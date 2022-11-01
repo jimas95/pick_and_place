@@ -1,0 +1,10 @@
+
+<launch>
+
+<!-- Start node action client. Mode param selects what action is going to be started from the node build wall or simple pick and place -->
+<arg name="mode" default="true" doc="select mode, True for wall build, false(default) for brick stacking"/>
+<param name="action_mode" type="bool" value="$(arg mode)" />
+<node  name="action_client" pkg="pick_and_place" type="action_client.py" respawn="false" output="screen" />
+
+
+</launch>

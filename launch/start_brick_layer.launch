@@ -1,15 +1,9 @@
 
 <launch>
-
-
 <arg name="use_rviz" default="true" doc="Launch Rviz with default config"/>
-
-    
-
-
-
-    <!-- builder  -->
-    <!-- <node pkg="pick_and_place" type="brick_builder.py" name="brick_builder" /> -->
+<arg name="mode"     default="true" doc="select mode, True for wall build, false(default) for brick stacking"/>
+<arg name="start_action"   default="true" doc="start client node"/>
+<arg name="start_builder"  default="true" doc="start buider node"/>
 
     <!-- launch panda robot -->
     <include file="$(find panda_moveit_config)/launch/demo.launch">
@@ -26,5 +20,18 @@
 
     <!-- yaml parameters  -->
     <rosparam command="load" file="$(find pick_and_place)/config/brick_data.yaml" />
+
+    <!-- builder  -->
+    <group if="$(arg start_builder)">
+        <node pkg="pick_and_place" type="brick_builder.py" name="brick_builder" output="screen"/>
+    </group>
+
+    <!-- client action -->
+    <group if="$(arg start_action)">
+        <include file="$(find pick_and_place)/launch/start_action.launch" if="$(arg use_rviz)">
+            <arg name="mode" value="$(arg mode)"/>
+        </include>
+    </group>
+
 
 </launch>
