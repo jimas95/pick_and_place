@@ -49,18 +49,19 @@ I took this assignment a step further and added the capability of building walls
 
 
 ## Approach
-The main approach here is that we exploit moveit both for planning and the PlanningSceneInterface in order to avoid obstacles. The whole implementation is based on the tutorial demo 'panda_moveit_config demo.launch'. A main function called go_to is responsible for moving the eef to the desired position and orientation. After this, additional functions for pick and place use the go_to function to perform simple manipulations. 
+The main approach here is that we exploit moveit both for planning and obstacle avoidance. The whole implementation is based on the tutorial demo 'panda_moveit_config demo.launch'. A main function called go_to is responsible for moving the eef to the desired position and orientation. After this, additional functions for pick and place use the go_to function to perform simple manipulations. 
 
 ### Dedicated Pick-Up Space
 The brick_data.yaml file defines a dedicated space (a cube of reconfigurable size(default 0.5)) where the bricks will be spawned. Inside this space, the bricks can be spawned anywhere and with random positions and orientations but always within this imaginary cube. 
 
 ### Pick And Place 
 The brick position and size are considered already known. Given those, we set the planer to first align with the orientation of the brick and right above it (on z axis) this is considered the pre-grasping position. After this first move, we move to the grasping position which is the position of the brick. When we reach the desired position we attach the eef to it and go back to pre-grasping position. A similar approach is being implemented for placing the brick in the desired position.
+
 ![brick_stack](https://github.com/jimas95/pick_and_place/blob/main/gifs/brick_stack.gif)
 
 
 ### Build A Wall
-An extra action/functionality has been implemented where the robot will start picking up bricks and start building a circular wall around it. The size,position and layers of the wall are set by the yaml file. 
+An extra action/functionality has been implemented where the robot will start picking up bricks and start building a circular wall around it. The size,position and layers of the wall are configured by the yaml file. 
 ![build_wall_robot](https://github.com/jimas95/pick_and_place/blob/main/gifs/build_wall_robot.gif)
 
 
