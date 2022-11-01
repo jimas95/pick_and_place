@@ -103,15 +103,15 @@ class PICK_AND_PLACE_BRICKS(object):
 
         # set up actions 
         name = "simple_pick_and_place"
-        self.simple_action = actionlib.SimpleActionServer(name, pick_and_place.msg.pick_and_placeAction, execute_cb=self.simple_pick_and_place_action_imp, auto_start = False)
+        self.simple_action = actionlib.SimpleActionServer(name, pick_and_place.msg.pickAndPlaceAction, execute_cb=self.simple_pick_and_place_action_imp, auto_start = False)
         self.simple_action.start()
 
         name = "build_wall"
-        self.build_action = actionlib.SimpleActionServer(name, pick_and_place.msg.pick_and_placeAction, execute_cb=self.build_action_imp, auto_start = False)
+        self.build_action = actionlib.SimpleActionServer(name, pick_and_place.msg.pickAndPlaceAction, execute_cb=self.build_action_imp, auto_start = False)
         self.build_action.start()
 
-        self.simple_feedback = pick_and_place.msg.pick_and_placeFeedback()
-        self.simple_result = pick_and_place.msg.pick_and_placeResult()  
+        self.simple_feedback = pick_and_place.msg.pickAndPlaceFeedback()
+        self.simple_result = pick_and_place.msg.pickAndPlaceResult()  
 
         # Misc variables
         self.box_name = "brick_01"
@@ -123,8 +123,8 @@ class PICK_AND_PLACE_BRICKS(object):
         self.brick_pose= geometry_msgs.msg.PoseStamped()
 
         # reset scene
-        self.detach_box()
-        self.remove_all_bricks()
+        # self.detach_box()
+        # self.remove_all_bricks()
 
 
 
@@ -145,6 +145,7 @@ class PICK_AND_PLACE_BRICKS(object):
         self.simple_feedback.z = self.brick_pose.pose.position.z
         self.simple_feedback.brick_id = self.brick_id
         self.grab_brick()
+        self.go_home()
 
         # place 
         rospy.loginfo("add_random_brick 2")
@@ -166,7 +167,7 @@ class PICK_AND_PLACE_BRICKS(object):
 
         rospy.loginfo("attemting to place brick 1 on top of second brick")
         self.place_brick(pose_goal)
-
+        self.go_home()
 
 
         self.simple_action.publish_feedback(self.simple_feedback)
@@ -177,7 +178,7 @@ class PICK_AND_PLACE_BRICKS(object):
 
         if success:
             self.simple_result.result = True
-            rospy.loginfo('%s: Succeeded' % self._action_name)
+            rospy.loginfo("Succeeded action pick and place")
             self.simple_action.set_succeeded(self.simple_result)
         
 
@@ -187,52 +188,70 @@ class PICK_AND_PLACE_BRICKS(object):
         pose_goal = geometry_msgs.msg.Pose()
         
         # publish info to the console for the user
-        rospy.loginfo("START SIMPLE PICK AND PLACE ACTION")
-        
-
-        # pick
-        rospy.loginfo("add_random_brick 1")
-        self.add_random_brick()
-        rospy.loginfo("attemting to grab brick 1")
-        self.simple_feedback.x = self.brick_pose.pose.position.x
-        self.simple_feedback.y = self.brick_pose.pose.position.y
-        self.simple_feedback.z = self.brick_pose.pose.position.z
-        self.simple_feedback.brick_id = self.brick_id
-        self.grab_brick()
-
-        # place 
-        rospy.loginfo("add_random_brick 2")
-        self.add_random_brick()
-
-        # create place pose 
-        pose_goal.orientation.x = self.brick_pose.pose.orientation.x
-        pose_goal.orientation.y = self.brick_pose.pose.orientation.y
-        pose_goal.orientation.z = self.brick_pose.pose.orientation.z
-        pose_goal.orientation.w = self.brick_pose.pose.orientation.w
-        pose_goal.position.x    = self.brick_pose.pose.position.x
-        pose_goal.position.y    = self.brick_pose.pose.position.y
-        pose_goal.position.z    = self.brick_pose.pose.position.z + self.yaml_data['brick_size']['height']*2
-
-        self.simple_feedback.x = pose_goal.position.x
-        self.simple_feedback.y = pose_goal.position.y
-        self.simple_feedback.z = pose_goal.position.z
-        self.simple_feedback.brick_id = self.brick_id
-
-        rospy.loginfo("attemting to place brick 1 on top of second brick")
-        self.place_brick(pose_goal)
+        rospy.loginfo("START BUILD WALL")
 
 
+        thikness = self.yaml_data['thikness']
+        step = int(self.angle_range/thikness)
 
-        self.simple_action.publish_feedback(self.simple_feedback)
+        for floor in range(self.yaml_data['layers']):
+            odd_or_even = floor % 2
+            start = 0 
+            if(odd_or_even):
+                start = int(step/2.0)
+            for theta in range(start,self.angle_range,step):
+                # pick
+                rospy.loginfo("add_random_brick")
+                self.add_random_brick()
+                rospy.loginfo("attemting to grab brick")
+                rospy.loginfo("brick --> " + str(self.brick_id))
+                self.simple_feedback.x = self.brick_pose.pose.position.x
+                self.simple_feedback.y = self.brick_pose.pose.position.y
+                self.simple_feedback.z = self.brick_pose.pose.position.z
+                self.simple_feedback.brick_id = self.brick_id
+                self.build_action.publish_feedback(self.simple_feedback)
+                self.grab_brick()
 
-        if self.simple_action.is_preempt_requested():
-            self.simple_action.set_preempted()
-            success = False
+                # find place coords 
+                x,y,angle_rad = self.polar_coords(theta)
+                q = quaternion_from_euler(pi, 0, angle_rad - pi/4 + pi/2)                
+
+                # create place pose 
+                pose_goal.orientation.x = q[0]
+                pose_goal.orientation.y = q[1]
+                pose_goal.orientation.z = q[2]
+                pose_goal.orientation.w = q[3]
+                pose_goal.position.x    = x
+                pose_goal.position.y    = y
+                pose_goal.position.z    = 0.1 + floor*(self.yaml_data['brick_size']['height']+0.02)
+
+                self.simple_feedback.x = pose_goal.position.x
+                self.simple_feedback.y = pose_goal.position.y
+                self.simple_feedback.z = pose_goal.position.z
+                self.simple_feedback.brick_id = self.brick_id
+                self.build_action.publish_feedback(self.simple_feedback)
+                rospy.loginfo("attemting to place brick on wall")
+                self.place_brick(pose_goal)
+                rospy.loginfo(self.build_action.is_preempt_requested())
+                rospy.loginfo(self.build_action.is_preempt_requested())
+                rospy.loginfo(self.build_action.is_preempt_requested())
+                
+                # stop action 
+                if self.build_action.is_preempt_requested():
+                    print("wtf")
+                    print("wtf")
+                    print("wtf")
+                    print("wtf")
+                    self.build_action.set_preempted()
+                    success = False
+                    self.simple_result.result = False
+                    self.build_action.set_succeeded(self.simple_result)
+                    return
 
         if success:
             self.simple_result.result = True
-            rospy.loginfo('%s: Succeeded' % self._action_name)
-            self.simple_action.set_succeeded(self.simple_result)
+            rospy.loginfo("Succeeded action pick and place")
+            self.build_action.set_succeeded(self.simple_result)
 
     def srv_simple_pick_and_place(self,req):
         self.simple_pick_and_place()
@@ -291,57 +310,60 @@ class PICK_AND_PLACE_BRICKS(object):
         pose_goal.position.y    = self.brick_pose.pose.position.y
         pose_goal.position.z    = self.brick_pose.pose.position.z
 
-        print("go_home")
-        self.go_home()
+        # rospy.loginfo("go_home")
+        # self.go_home()
 
         # aling with cube
-        print("pree_grab")
+        rospy.loginfo("pree_grab")
         pose_goal.position.z = pose_goal.position.z + 0.2 + self.yaml_data['brick_size']['height']/2
         self.go_to(pose_goal)
 
         # go to cube
-        print("pose_grab")
+        rospy.loginfo("pose_grab")
         pose_goal.position.z = pose_goal.position.z - 0.2 + self.yaml_data['brick_size']['height']
         self.go_to(pose_goal)
 
         # attach 
-        print("attach_box")
+        rospy.loginfo("attach_box")
         self.box_name = "brick_0" + str(self.brick_id)
         self.attach_box()
 
-        print("go_home")
-        self.go_home()
+        # rospy.loginfo("go_home")
+        # self.go_home()
 
     # place brick at given pose 
     def place_brick(self,pose):
 
-        print("go_home")
-        self.go_home()
+        # rospy.loginfo("go_home")
+        # self.go_home()
 
         # aling with cube
-        print("pree_place")
+        rospy.loginfo("pree_place")
         pose.position.z = pose.position.z + 0.2 
         self.go_to(pose)
 
         # go to cube
-        print("pose_place")
+        rospy.loginfo("pose_place")
         pose.position.z = pose.position.z - 0.15
         self.go_to(pose)
 
         # attach 
-        print("detach_box")
+        rospy.loginfo("detach_box")
         self.detach_box()
 
-        print("go_home")
-        self.go_home()
+        # rospy.loginfo("go_home")
+        # self.go_home()
 
     #  simple pick and place implementation for 2 bricks 
     def simple_pick_and_place(self):
         
         # pick
+        rospy.loginfo("go_home")
+        self.go_home()
         self.add_random_brick()
         self.grab_brick()
-
+        rospy.loginfo("go_home")
+        self.go_home()
         # place 
         self.add_random_brick()
 
@@ -512,7 +534,7 @@ def main():
         print("Press Ctrl-D to exit at any time")
         print("")
     
-        tutorial = PICK_AND_PLACE_BRICKS()
+        builder = PICK_AND_PLACE_BRICKS()
         rospy.spin()
 
     except rospy.ROSInterruptException:
